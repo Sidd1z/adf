@@ -50,7 +50,14 @@
 						{
 							"name": "getNewWatermarkValue",
 							"type": "Lookup",
-							"dependsOn": [],
+							"dependsOn": [
+								{
+									"activity": "StoredProceduretoLogStart",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
 							"policy": {
 								"timeout": "0.12:00:00",
 								"retry": 0,
@@ -268,7 +275,7 @@
 							},
 							"userProperties": [],
 							"typeProperties": {
-								"storedProcedureName": "[dbo].[usp_LogActivityFailure]",
+								"storedProcedureName": "[dbo].[Log_Capture]",
 								"storedProcedureParameters": {
 									"ActivityName": {
 										"value": "opy data from source to txt",
@@ -282,7 +289,7 @@
 										"value": "@activity('Copy data from source to txt').error.message",
 										"type": "String"
 									},
-									"LoggedAtUtc": {
+									"EndTimeUtc ": {
 										"value": "@utcNow()",
 										"type": "DateTime"
 									},
@@ -292,9 +299,58 @@
 									},
 									"TableName": {
 										"value": {
-											"value": "@item().TableName",
+											"value": "@item().Table_Name",
 											"type": "Expression"
 										},
+										"type": "String"
+									},
+									"Mode": {
+										"value": "FAILED",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase1",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "StoredProceduretoLogStart",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Log_Capture]",
+								"storedProcedureParameters": {
+									"ActivityName": {
+										"value": "opy data from source to txt",
+										"type": "String"
+									},
+									"StartTimeUtc ": {
+										"value": "@utcNow()",
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									},
+									"TableName": {
+										"value": {
+											"value": "@item().Table_Name",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Mode": {
+										"value": "START",
 										"type": "String"
 									}
 								}
