@@ -1,0 +1,259 @@
+{
+	"name": "IncrementalLoad_using_loop",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetTableDetail",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select * from water_mark_table",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlTable2",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableDetail",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableDetail').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "getNewWatermarkValue",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[usp_GetHighWatermark]",
+									"storedProcedureParameters": {
+										"TableName": {
+											"type": "String",
+											"value": {
+												"value": "@item().Table_Name",
+												"type": "Expression"
+											}
+										},
+										"WatermarkColumn": {
+											"type": "String",
+											"value": {
+												"value": "@item().watermark_column",
+												"type": "Expression"
+											}
+										},
+										"WatermarkType": {
+											"type": "String",
+											"value": {
+												"value": "@item().watermark_type",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "WaterMark",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Copy data from source to txt",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "getNewWatermarkValue",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[GetsourceData]",
+									"storedProcedureParameters": {
+										"HighWatermarkDt": {
+											"type": "DateTime",
+											"value": {
+												"value": "@activity('getNewWatermarkValue').output.firstRow.HighWatermarkDatetime",
+												"type": "Expression"
+											}
+										},
+										"HighWatermarkId": {
+											"type": "Int64",
+											"value": {
+												"value": "@activity('getNewWatermarkValue').output.firstRow.HighWatermarkId",
+												"type": "Expression"
+											}
+										},
+										"TableName": {
+											"type": "String",
+											"value": {
+												"value": "@item().Table_Name",
+												"type": "Expression"
+											}
+										},
+										"WatermarkType": {
+											"type": "String",
+											"value": {
+												"value": "@item().watermark_type",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "SourceSqlTble",
+									"type": "DatasetReference"
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "sinkfile",
+									"type": "DatasetReference",
+									"parameters": {
+										"fileName": {
+											"value": "@concat('Incremental-', item().Table_Name, '-', pipeline().RunId, '.txt')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "StoredProceduretoWriteWatermarkActivity",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy data from source to txt",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_UpdateWatermark]",
+								"storedProcedureParameters": {
+									"NewWatermarkDatetime": {
+										"value": {
+											"value": "@activity('getNewWatermarkValue').output.firstRow.HighWatermarkDatetime",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"NewWatermarkId": {
+										"value": {
+											"value": "@activity('getNewWatermarkValue').output.firstRow.HighWatermarkId",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"TableName": {
+										"value": {
+											"value": "@item().Table_Name",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"WatermarkType": {
+										"value": {
+											"value": "@item().watermark_type",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase1",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-05-19T16:26:51Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
