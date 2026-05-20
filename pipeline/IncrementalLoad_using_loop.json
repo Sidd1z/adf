@@ -150,7 +150,7 @@
 										"WatermarkType": {
 											"type": "String",
 											"value": {
-												"value": "XYZ",
+												"value": "@item().watermark_type",
 												"type": "Expression"
 											}
 										}
@@ -351,6 +351,68 @@
 									},
 									"Mode": {
 										"value": "START",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase1",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "StoredProceduretoWriteSuccess",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "StoredProceduretoWriteWatermarkActivity",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Log_Capture]",
+								"storedProcedureParameters": {
+									"ActivityName": {
+										"value": "StoredProceduretoWriteSuccess",
+										"type": "String"
+									},
+									"RowsCopied": {
+										"value": {
+											"value": "@activity('Copy data from source to txt').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"EndTimeUtc ": {
+										"value": "@utcNow()",
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									},
+									"TableName": {
+										"value": {
+											"value": "@item().Table_Name",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Mode": {
+										"value": {
+											"value": "@if(greater(activity('Copy data from source to txt').output.rowsCopied, 0), 'SUCCESS', 'NODATA')",
+											"type": "Expression"
+										},
 										"type": "String"
 									}
 								}
