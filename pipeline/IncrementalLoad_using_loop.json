@@ -143,7 +143,7 @@
 										"WatermarkType": {
 											"type": "String",
 											"value": {
-												"value": "@item().watermark_type",
+												"value": "XYZ",
 												"type": "Expression"
 											}
 										}
@@ -237,6 +237,62 @@
 									"WatermarkType": {
 										"value": {
 											"value": "@item().watermark_type",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase1",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "StoredProceduretoWriteopyError",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy data from source to txt",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_LogActivityFailure]",
+								"storedProcedureParameters": {
+									"ActivityName": {
+										"value": "opy data from source to txt",
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": "@activity('Copy data from source to txt').error.errorCode",
+										"type": "String"
+									},
+									"ErrorMessage": {
+										"value": "@activity('Copy data from source to txt').error.message",
+										"type": "String"
+									},
+									"LoggedAtUtc": {
+										"value": "@utcNow()",
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									},
+									"TableName": {
+										"value": {
+											"value": "@item().TableName",
 											"type": "Expression"
 										},
 										"type": "String"
