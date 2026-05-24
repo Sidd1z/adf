@@ -15,7 +15,7 @@
 			"value": "adfetlsidd.database.windows.net"
 		},
 		"AzureSqlDatabase1_properties_typeProperties_database": {
-			"value": "sidd_test"
+			"value": "ADFSource"
 		},
 		"AzureSqlDatabase1_properties_typeProperties_userName": {
 			"value": "CloudSAaac172ba"

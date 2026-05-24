@@ -21,7 +21,7 @@
 		},
 		"AzureSqlDatabase1_properties_typeProperties_database": {
 			"type": "string",
-			"defaultValue": "sidd_test"
+			"defaultValue": "ADFSource"
 		},
 		"AzureSqlDatabase1_properties_typeProperties_userName": {
 			"type": "string",
