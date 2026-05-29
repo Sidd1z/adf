@@ -120,7 +120,16 @@
 								"secureOutput": false,
 								"secureInput": false
 							},
-							"userProperties": [],
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "dbo.data_source_table"
+								},
+								{
+									"name": "Destination",
+									"value": "filestorageminu/@{concat(\n  'raw/bronze/',\n  item().table_name,\n  '/ingest_dt=',\n  formatDateTime(utcNow(),'yyyy-MM-dd')\n)\n}/@{concat(   'Incremental-',   item().table_name,   '-',   pipeline().RunId,   '.parquet' ) }"
+								}
+							],
 							"typeProperties": {
 								"source": {
 									"type": "AzureSqlSource",
@@ -159,14 +168,13 @@
 									"partitionOption": "None"
 								},
 								"sink": {
-									"type": "DelimitedTextSink",
+									"type": "ParquetSink",
 									"storeSettings": {
-										"type": "AzureBlobStorageWriteSettings"
+										"type": "AzureBlobFSWriteSettings",
+										"copyBehavior": "PreserveHierarchy"
 									},
 									"formatSettings": {
-										"type": "DelimitedTextWriteSettings",
-										"quoteAllText": true,
-										"fileExtension": ".txt"
+										"type": "ParquetWriteSettings"
 									}
 								},
 								"enableStaging": false,
@@ -187,11 +195,15 @@
 							],
 							"outputs": [
 								{
-									"referenceName": "sinkfile",
+									"referenceName": "ADLSParquet",
 									"type": "DatasetReference",
 									"parameters": {
-										"fileName": {
-											"value": "@concat('Incremental-', item().Table_Name, '-', pipeline().RunId, '.txt')",
+										"FolderPath": {
+											"value": "@concat(\n  'raw/bronze/',\n  item().table_name,\n  '/ingest_dt=',\n  formatDateTime(utcNow(),'yyyy-MM-dd')\n)\n",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(   'Incremental-',   item().table_name,   '-',   pipeline().RunId,   '.parquet' ) ",
 											"type": "Expression"
 										}
 									}
@@ -199,7 +211,7 @@
 							]
 						},
 						{
-							"name": "StoredProceduretoWriteWatermarkActivity",
+							"name": "SPWriteWatermarkActivity",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
@@ -256,7 +268,7 @@
 							}
 						},
 						{
-							"name": "StoredProceduretoWriteopyError",
+							"name": "SPWriteError",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
@@ -282,19 +294,31 @@
 										"type": "String"
 									},
 									"ErrorCode": {
-										"value": "@activity('Copy data from source to txt').error.errorCode",
+										"value": {
+											"value": "@activity('Copy data from source to txt').error.errorCode",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"ErrorMessage": {
-										"value": "@activity('Copy data from source to txt').error.message",
+										"value": {
+											"value": "@activity('Copy data from source to txt').error.message",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"EndTimeUtc ": {
-										"value": "@utcNow()",
+										"value": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										},
 										"type": "DateTime"
 									},
 									"PipelineRunId": {
-										"value": "@pipeline().RunId",
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"TableName": {
@@ -335,11 +359,17 @@
 										"type": "String"
 									},
 									"StartTimeUtc ": {
-										"value": "@utcNow()",
+										"value": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										},
 										"type": "DateTime"
 									},
 									"PipelineRunId": {
-										"value": "@pipeline().RunId",
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"TableName": {
@@ -361,11 +391,11 @@
 							}
 						},
 						{
-							"name": "StoredProceduretoWriteSuccess",
+							"name": "SPWriteSuccess",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
-									"activity": "StoredProceduretoWriteWatermarkActivity",
+									"activity": "SPWriteWatermarkActivity",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -394,11 +424,17 @@
 										"type": "String"
 									},
 									"EndTimeUtc ": {
-										"value": "@utcNow()",
+										"value": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										},
 										"type": "DateTime"
 									},
 									"PipelineRunId": {
-										"value": "@pipeline().RunId",
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"TableName": {
@@ -420,6 +456,37 @@
 							"linkedServiceName": {
 								"referenceName": "AzureSqlDatabase1",
 								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Notebook1",
+							"type": "DatabricksNotebook",
+							"state": "Inactive",
+							"onInactiveMarkAs": "Succeeded",
+							"dependsOn": [
+								{
+									"activity": "SPWriteSuccess",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"libraries": [
+									{
+										"pypi": {
+											"package": ""
+										}
+									}
+								]
 							}
 						}
 					]
